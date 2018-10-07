@@ -1,5 +1,7 @@
 from pyspark import  SparkConf, SparkContext
 from pyspark.mllib.regression import LabeledPoint
+from pyspark.mllib.tree import RandomForest, RandomForestModel
+from pyspark.mllib.util import MLUtils
 
 
 
@@ -41,5 +43,8 @@ data = sc.parallelize([lp1, lp2, lp3, lp4])
 # splitting the dataset into train and test set
 # both are individual LabeledPoint RDDs 
 train, test = data.randomSplit([80.0, 20.0])
+
+
+model = RandomForest.trainClassifier(train, numClasses=2, categoricalFeaturesInfo={},numTrees=3, featureSubsetStrategy="auto",impurity='gini', maxDepth=4, maxBins=32)
 
 
