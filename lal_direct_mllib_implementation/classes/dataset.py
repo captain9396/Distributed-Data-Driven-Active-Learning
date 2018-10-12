@@ -33,8 +33,8 @@ FILES in HDFS
 # fileDirectory = 'checkerboard2x2_train.txt'
 # fileDirectory = 'checkerboard4x4_test.txt'
 # fileDirectory = 'checkerboard4x4_train.txt'
-# fileDirectory = 'striatum_test_data.txt'
-# fileDirectory = 'striatum_train_data.txt'
+# fileDirectory = 'striatum_train.mini.txt'
+# fileDirectory = 'striatum_test_mini.txt'
 # fileDirectory = 'rotated_checkerboard2x2_test.txt'
 # fileDirectory = 'rotated_checkerboard2x2_train.txt'
 
@@ -145,14 +145,46 @@ class DatasetRotatedCheckerboard2x2(Dataset):
         self.testSet = labels.zip(scaler.transform(features)) \
             .map(lambda _: LabeledPoint(_[0], _[1]))
 
-    
+
+
+
+
+
+class DatasetStriatumMini(Dataset):
+    '''Dataset from CVLab. https://cvlab.epfl.ch/data/em
+    Features as in A. Lucchi, Y. Li, K. Smith, and P. Fua. Structured
+     Image Segmentation Using Kernelized Features. ECCV, 2012'''
+
+    def __init__(self):
+        trainDirectory = HDFS_DIRECTORY + 'striatum_train_mini.txt'
+        train = sc.textFile(trainDirectory)
+        features = train.map(lambda _: _.strip().split(' ')[:-1])
+        labels = train.map(lambda _: _.strip().split(' ')[-1])
+        scaler = StandardScaler(withMean=True, withStd=True).fit(features)
+        self.trainSet = labels.zip(scaler.transform(features)) \
+            .map(lambda _: LabeledPoint(0 if _[0] == '-1' else 1, _[1]))
+
+
+
+        testDirectory = HDFS_DIRECTORY + 'striatum_test_mini.txt'
+        test = sc.textFile(testDirectory)
+        features = test.map(lambda _: _.split(' ')[:-1])
+        labels = test.map(lambda _: _.split(' ')[-1])
+
+        # AN ISSUE HERE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        # in original LAL code they scaled testset with previous scaler, but why?
+
+        scaler = StandardScaler(withMean=True, withStd=True).fit(features)
+        self.testSet = labels.zip(scaler.transform(features)) \
+            .map(lambda _: LabeledPoint(0 if _[0] == '-1' else 1, _[1]))
+        
 
 
 
 
 
 
-ds = DatasetRotatedCheckerboard2x2()
+ds = DatasetStriatumMini()
 
 
 
