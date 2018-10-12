@@ -11,6 +11,10 @@ from datetime import timedelta
 
 # setup spark context and config
 conf = SparkConf().setAppName("test")
+
+# conf = SparkConf().setAppName("Print Elements of RDD")\
+#     .setMaster("local[4]").set("spark.executor.memory","1g");
+
 sc = SparkContext(conf=conf)
 
 
@@ -36,26 +40,72 @@ FILES in HDFS
 
 
 ## here some changes needed to be made <<<<<<<<<<<
-class DatasetCheckerboard2x2:
+
+
+
+class Dataset:
+    def __init__(self):
+        # each dataset will have training and test data with label
+        self.trainData = None
+        self.trainLabels = None
+        self.testData = None
+        self.testLabels = None
+
+
+
+
+
+class DatasetCheckerboard2x2(Dataset):
 
     def __init__(self):
+        Dataset.__init__(self)
 
         trainDirectory =  HDFS_DIRECTORY + 'checkerboard2x2_train.txt'
         train = sc.textFile(trainDirectory)
         features = train.map(lambda _ : _.split(' ')[:-1])
         labels = train.map(lambda _: _.split(' ')[-1])
         scaler = StandardScaler(withMean=True, withStd=True).fit(features)
-        self.trainSet = labels.zip(scaler.transform(features.map(lambda x: Vectors.dense(x))))
+        self.trainSet = labels.zip(scaler.transform(features)).map(lambda _: LabeledPoint(_[0], _[1]))
 
         testDirectory = HDFS_DIRECTORY + 'checkerboard2x2_test.txt'
         test = sc.textFile(testDirectory)
         features = test.map(lambda _ : _.split(' ')[:-1])
         labels = test.map(lambda _: _.split(' ')[-1])
         scaler = StandardScaler(withMean=True, withStd=True).fit(features)
-        self.testSet = labels.zip(scaler.transform(features.map(lambda x: Vectors.dense(x))))
+        self.testSet = labels.zip(scaler.transform(features)).map(lambda _: LabeledPoint(_[0], _[1]))
 
-        print(self.trainSet.take(3))
-        print(self.testSet.take(3))
+
+
+
+        # reg = RandomForest.trainRegressor(self.trainSet, numTrees=100, categoricalFeaturesInfo={})
+        # predictions = reg.predict(self.testSet.map(lambda x: x.features))
+        # labelsAndPredictions = self.testSet.map(lambda lp: lp.label).zip(predictions)
+        # testMSE = labelsAndPredictions.map(lambda x: (x[0] - x[1]) ** 2).sum() / float(self.testSet.count())
+        # print('Test Mean Squared Error = ' + str(testMSE))
+
+
+
+
+
+class DatasetCheckerboard4x4(Dataset):
+
+    def __init__(self):
+        Dataset.__init__(self)
+
+        trainDirectory =  HDFS_DIRECTORY + 'checkerboard4x4_train.txt'
+        train = sc.textFile(trainDirectory)
+        features = train.map(lambda _ : _.split(' ')[:-1])
+        labels = train.map(lambda _: _.split(' ')[-1])
+        scaler = StandardScaler(withMean=True, withStd=True).fit(features)
+        self.trainSet = labels.zip(scaler.transform(features)).map(lambda _ : LabeledPoint(_[0], _[1]))
+
+
+        testDirectory = HDFS_DIRECTORY + 'checkerboard4x4_test.txt'
+        test = sc.textFile(testDirectory)
+        features = test.map(lambda _ : _.split(' ')[:-1])
+        labels = test.map(lambda _: _.split(' ')[-1])
+        scaler = StandardScaler(withMean=True, withStd=True).fit(features)
+        self.testSet = labels.zip(scaler.transform(features)).map(lambda _ : LabeledPoint(_[0], _[1]))
 
 
 
