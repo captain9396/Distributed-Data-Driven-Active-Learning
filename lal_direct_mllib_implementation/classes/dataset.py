@@ -4,6 +4,7 @@ from pyspark.mllib.linalg import Vectors
 from pyspark.mllib.tree import RandomForest, RandomForestModel
 from pyspark.mllib.util import MLUtils
 from pyspark.mllib.feature import StandardScaler, StandardScalerModel
+import random
 import datetime
 from datetime import timedelta
 
@@ -44,14 +45,47 @@ FILES in HDFS
 ## here some changes needed to be made <<<<<<<<<<<
 
 
-
 class Dataset:
+
     def __init__(self):
         # each dataset will have training and test data with label
-        self.trainData = None
-        self.trainLabels = None
-        self.testData = None
-        self.testLabels = None
+        self.trainSet = None
+        self.testSet = None
+
+
+    def setStartState(self, nStart):
+        ''' This functions initialises fields indicesKnown and
+            indicesUnknown which contain the indices of labelled and
+            unlabeled datapoints
+        Input:
+        nStart -- number of labelled datapoints (size of indicesKnown)
+        '''
+
+        self.nStart = nStart
+        # first get 1 positive and 1 negative point so that both classes are represented and initial
+        # classifer could be trained. Here zipWithIndex() method takes the labels one-by-one and forms
+        # rdd of (label,index) pairs then we filter it to get the indices of positive labels only
+
+        positiveIndices = self.trainSet.map(lambda _ : _.label)\
+            .zipWithIndex()\
+            .filter(lambda _ : _[0] == 1.0)
+
+        shuffledPositiveIndices = positiveIndices.sortBy(lambda _: random.random())
+
+
+
+        negativeIndices = self.trainSet.map(lambda _: _.label) \
+            .zipWithIndex() \
+            .filter(lambda _: _[0] == 0.0)
+        shuffledNegativeIndices = negativeIndices.sortBy(lambda _: random.random())
+
+        # self.indicesKnown = sc.parallelize([shuffledPositiveIndices.take(1)[0], shuffledNegativeIndices.take(1)[0]])
+        self.indicesKnown = sc.parallelize([shuffledPositiveIndices.take(1)[0], shuffledNegativeIndices.take(1)[0]])
+
+        print(self.indicesKnown.collect())
+        
+
+
 
 
 
@@ -156,6 +190,8 @@ class DatasetStriatumMini(Dataset):
      Image Segmentation Using Kernelized Features. ECCV, 2012'''
 
     def __init__(self):
+        Dataset.__init__(self)
+
         trainDirectory = HDFS_DIRECTORY + 'striatum_train_mini.txt'
         train = sc.textFile(trainDirectory)
         features = train.map(lambda _: _.strip().split(' ')[:-1])
@@ -172,22 +208,24 @@ class DatasetStriatumMini(Dataset):
         labels = test.map(lambda _: _.split(' ')[-1])
 
         # AN ISSUE HERE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        # in original LAL code they scaled testset with previous scaler, but why?
+        # in original LAL code they scaled testset with the scaler fitted from TRAINING set, but why?
 
         scaler = StandardScaler(withMean=True, withStd=True).fit(features)
         self.testSet = labels.zip(scaler.transform(features)) \
             .map(lambda _: LabeledPoint(0 if _[0] == '-1' else 1, _[1]))
-        
 
 
 
 
 
 
-ds = DatasetStriatumMini()
 
 
 
 
+
+ds = DatasetCheckerboard2x2()
+
+ds.setStartState(2)
 
 
