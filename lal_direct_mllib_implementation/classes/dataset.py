@@ -54,50 +54,84 @@ class Dataset:
 
 
     def setStartState(self, nStart):
-        ''' This functions initialises fields indicesKnown and
+        '''
+            Input:
+            nStart -- number of labelled datapoints (size of indicesKnown)
+
+        This functions initialises fields indicesKnown and
             indicesUnknown which contain the indices of labelled and
-            unlabeled datapoints
-        Input:
-        nStart -- number of labelled datapoints (size of indicesKnown)
+            unlabeled datapoints for example if nStart = 5, then there
+            will be initially 5 labeled instances to start with.
+            The basic workflow is first we get 1 +ve and 1 -ve label
+            then we take the rest of the instances and shuffle them
+            randomly finally we have TWO class members:
+
+            self.indicesKnown = the 'nStart' number of labeled instances to start the lal-proceduce initially
+            self.indicesUnknown = the rest of the UNlabeled instances
+
+
+            N.B.
+            By default nStart = 2, i.e. we will have 2 instances from each of the classes as initially labeled dataset
+            in self.indicesKnown.
+            But if nStart > 2, then we would first take 2 from the datasets and take another (nStart-2) instances randomly
+            and add them to self.indicesKnown.
         '''
 
         self.nStart = nStart
+
         # first get 1 positive and 1 negative point so that both classes are represented and initial
         # classifer could be trained. Here zipWithIndex() method takes the labels one-by-one and forms
         # rdd of (label,index) pairs then we filter it to get the indices of positive labels only
-
         positiveIndices = self.trainSet.map(lambda _ : _.label)\
             .zipWithIndex()\
             .filter(lambda _ : _[0] == 1.0)
 
+
+        # permuting the positive indices randomly
         shuffledPositiveIndices = positiveIndices.sortBy(lambda _: random.random())
 
 
-
+        # sorting out the negative labels with their indices
         negativeIndices = self.trainSet.map(lambda _: _.label) \
             .zipWithIndex() \
             .filter(lambda _: _[0] == 0.0)
         shuffledNegativeIndices = negativeIndices.sortBy(lambda _: random.random())
 
-        # self.indicesKnown = sc.parallelize([shuffledPositiveIndices.take(1)[0], shuffledNegativeIndices.take(1)[0]])
+        # permuting the negative indices randomly
         self.indicesKnown = sc.parallelize([shuffledPositiveIndices.take(1)[0], shuffledNegativeIndices.take(1)[0]])
 
 
+        # gathering all the rest of the labels together
         restOfThePositives = shuffledPositiveIndices.subtract(self.indicesKnown)
         restOfTheNegatives = shuffledNegativeIndices.subtract(self.indicesKnown)
-
-
         indicesRestAll = restOfThePositives.union(restOfTheNegatives)
-        # permute them
-        indicesRestAll = indicesRestAll.sortBy(lambda _: random.random())
 
-        print(indicesRestAll.collect())
+        # permute them
+        indicesRestAll = indicesRestAll\
+            .sortBy(lambda _: random.random())\
+            .zipWithIndex()
+
 
         # if we need more than 2 datapoints, select the rest nStart-2 at random
-        # if nStart > 2:
-        #     self.indicesKnown = np.concatenate(([self.indicesKnown, indicesRestAll[0:nStart - 2]]));
-        #     # the rest of the points will be unlabeled at the beginning
-        # self.indicesUnknown = indicesRestAll[nStart - 2:]
+        if nStart > 2:
+            # concatenating initially 2 known instances with another (nStart-2, so total = nStart) instances from first
+            self.indicesKnown = self.indicesKnown\
+                .union(indicesRestAll
+                       .filter(lambda _ : _[1] < nStart-2)
+                       .map(lambda _ : _[0]))
+
+        # the rest of the points will be unlabeled at the beginning
+        # here we are taking all after first 'nStart' items
+        self.indicesUnknown = indicesRestAll\
+            .filter(lambda _ : _[1] >= nStart-2)\
+            .map(lambda _ : _[0])
+
+        print("########################## no. of labeled instances = " , self.indicesKnown.count())
+        print("########################## no. of UNlabeled instances = ", self.indicesUnknown.count())
+        # print('------------------- LABELED INSTANCES -------------------\n' , self.indicesKnown.collect())
+        # print('------------------- UNLABELED INSTANCES -------------------\n', self.indicesUnknown.collect())
+
+
 
 
 
@@ -112,6 +146,9 @@ class DatasetCheckerboard2x2(Dataset):
 
     def __init__(self):
         Dataset.__init__(self)
+
+
+        # preparing the Data (Train and Test) : formatting and scaling then making it an RDD of LabeledPoints
 
         trainDirectory =  HDFS_DIRECTORY + 'checkerboard2x2_train.txt'
         train = sc.textFile(trainDirectory)
@@ -239,8 +276,8 @@ class DatasetStriatumMini(Dataset):
 
 
 
-ds = DatasetCheckerboard2x2()
+ds = DatasetStriatumMini()
 
-ds.setStartState(2)
+ds.setStartState(4)
 
 
