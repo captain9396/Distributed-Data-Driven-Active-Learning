@@ -82,8 +82,23 @@ class Dataset:
         # self.indicesKnown = sc.parallelize([shuffledPositiveIndices.take(1)[0], shuffledNegativeIndices.take(1)[0]])
         self.indicesKnown = sc.parallelize([shuffledPositiveIndices.take(1)[0], shuffledNegativeIndices.take(1)[0]])
 
-        print(self.indicesKnown.collect())
-        
+
+        restOfThePositives = shuffledPositiveIndices.subtract(self.indicesKnown)
+        restOfTheNegatives = shuffledNegativeIndices.subtract(self.indicesKnown)
+
+
+        indicesRestAll = restOfThePositives.union(restOfTheNegatives)
+        # permute them
+        indicesRestAll = indicesRestAll.sortBy(lambda _: random.random())
+
+        print(indicesRestAll.collect())
+
+        # if we need more than 2 datapoints, select the rest nStart-2 at random
+        # if nStart > 2:
+        #     self.indicesKnown = np.concatenate(([self.indicesKnown, indicesRestAll[0:nStart - 2]]));
+        #     # the rest of the points will be unlabeled at the beginning
+        # self.indicesUnknown = indicesRestAll[nStart - 2:]
+
 
 
 
