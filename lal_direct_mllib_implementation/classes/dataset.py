@@ -78,27 +78,32 @@ class Dataset:
         '''
 
         self.nStart = nStart
+        # indexing the whole dataset
+        self.trainSet = self.trainSet.zipWithIndex().map(lambda _ : (_[1] , _[0]))
+        self.testSet = self.testSet.zipWithIndex().map(lambda _: (_[1], _[0]))
+
 
         # first get 1 positive and 1 negative point so that both classes are represented and initial
         # classifer could be trained. Here zipWithIndex() method takes the labels one-by-one and forms
         # rdd of (label,index) pairs then we filter it to get the indices of positive labels only
-        positiveIndices = self.trainSet.map(lambda _ : _.label)\
-            .zipWithIndex()\
-            .filter(lambda _ : _[0] == 1.0)
 
+        positiveIndices = self.trainSet\
+            .filter(lambda _ : _[1].label == 1.0)\
+            .map(lambda _ : _[0])
 
         # permuting the positive indices randomly
         shuffledPositiveIndices = positiveIndices.sortBy(lambda _: random.random())
 
 
         # sorting out the negative labels with their indices
-        negativeIndices = self.trainSet.map(lambda _: _.label) \
-            .zipWithIndex() \
-            .filter(lambda _: _[0] == 0.0)
+        negativeIndices = self.trainSet\
+            .filter(lambda _ : _[1].label == 0.0)\
+            .map(lambda _ : _[0])
+        # permuting the negative indices randomly
         shuffledNegativeIndices = negativeIndices.sortBy(lambda _: random.random())
 
-        # permuting the negative indices randomly
-        self.indicesKnown = sc.parallelize([shuffledPositiveIndices.take(1)[0], shuffledNegativeIndices.take(1)[0]])
+        # taking one from each of the classes
+        self.indicesKnown = sc.parallelize([shuffledPositiveIndices.take(1), shuffledNegativeIndices.take(1)]).map(lambda _ : _[0])
 
 
         # gathering all the rest of the labels together
@@ -108,28 +113,29 @@ class Dataset:
 
         # permute them
         indicesRestAll = indicesRestAll\
-            .sortBy(lambda _: random.random())\
-            .zipWithIndex()
-
+            .sortBy(lambda _: random.random())
 
         # if we need more than 2 datapoints, select the rest nStart-2 at random
         if nStart > 2:
             # concatenating initially 2 known instances with another (nStart-2, so total = nStart) instances from first
             self.indicesKnown = self.indicesKnown\
-                .union(indicesRestAll
+                .union(indicesRestAll.zipWithIndex()
                        .filter(lambda _ : _[1] < nStart-2)
                        .map(lambda _ : _[0]))
 
         # the rest of the points will be unlabeled at the beginning
         # here we are taking all after first 'nStart' items
-        self.indicesUnknown = indicesRestAll\
+        self.indicesUnknown = indicesRestAll.zipWithIndex()\
             .filter(lambda _ : _[1] >= nStart-2)\
             .map(lambda _ : _[0])
 
-        print("########################## no. of labeled instances = " , self.indicesKnown.count())
-        print("########################## no. of UNlabeled instances = ", self.indicesUnknown.count())
+
+        # print("########################## no. of labeled instances = " , self.indicesKnown.count())
+        # print("########################## no. of UNlabeled instances = ", self.indicesUnknown.count())
         # print('------------------- LABELED INSTANCES -------------------\n' , self.indicesKnown.collect())
         # print('------------------- UNLABELED INSTANCES -------------------\n', self.indicesUnknown.collect())
+        print('------------------- Trainset -------------------\n', self.trainSet.take(10))
+        print('------------------- Testset -------------------\n', self.testSet.take(10))
 
 
 
@@ -276,8 +282,8 @@ class DatasetStriatumMini(Dataset):
 
 
 
-ds = DatasetStriatumMini()
+ds = DatasetRotatedCheckerboard2x2()
 
-ds.setStartState(4)
+ds.setStartState(7)
 
 
