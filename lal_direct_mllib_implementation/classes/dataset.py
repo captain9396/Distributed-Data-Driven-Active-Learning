@@ -134,8 +134,8 @@ class Dataset:
         # print("########################## no. of UNlabeled instances = ", self.indicesUnknown.count())
         # print('------------------- LABELED INSTANCES -------------------\n' , self.indicesKnown.collect())
         # print('------------------- UNLABELED INSTANCES -------------------\n', self.indicesUnknown.collect())
-        print('------------------- Trainset -------------------\n', self.trainSet.take(10))
-        print('------------------- Testset -------------------\n', self.testSet.take(10))
+        # print('------------------- Trainset -------------------\n', self.trainSet.take(10))
+        # print('------------------- Testset -------------------\n', self.testSet.take(10))
 
 
 
@@ -282,8 +282,8 @@ class DatasetStriatumMini(Dataset):
 
 
 
-ds = DatasetRotatedCheckerboard2x2()
+# ds = DatasetRotatedCheckerboard2x2()
 
-ds.setStartState(7)
+# ds.setStartState(7)
 
 
