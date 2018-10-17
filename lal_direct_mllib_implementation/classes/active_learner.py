@@ -44,7 +44,8 @@ class ActiveLearner:
 
 
     def reset(self):
-        '''forget all the points sampled by active learning and set labelled and unlabelled sets to default of the dataset'''
+        '''forget all the points sampled by active learning and set labelled
+         and unlabelled sets to default of the dataset'''
         self.indicesKnown = self.dataset.indicesKnown
         self.indicesUnknown = self.dataset.indicesUnknown
 
@@ -55,26 +56,33 @@ class ActiveLearner:
         '''train the base classification model on currently available datapoints'''
 
         # first fetch the subset of training data which match the indices of the known indices
-        trainDataKnown = self.indicesKnown.map(lambda _ : (_, None)).leftOuterJoin(self.dataset.trainSet).map(lambda _ : (_[0], _[1][1]))
+        trainDataKnown = self.indicesKnown.map(lambda _ : (_, None))\
+            .leftOuterJoin(self.dataset.trainSet)\
+            .map(lambda _ : (_[0], _[1][1]))
 
-        testData = self.dataset.testSet.map(lambda _ : _[1].features)
+        # testData = self.dataset.testSet.map(lambda _ : _[1].features)
 
 
         # train a RFclassifer with this data
         self.model = RandomForest.trainClassifier(trainDataKnown.map(lambda _ : _[1]),
                                                   numClasses=2,
                                                   categoricalFeaturesInfo={},
-                                                  numTrees=100,
+                                                  numTrees=self.nEstimators,
                                                   featureSubsetStrategy="auto",
                                                   impurity='gini')
 
-        trees = [DecisionTreeModel(self.model._java_model.trees()[i]) for i in range(100)]
 
 
-        predictions = [t.predict(testData) for t in trees]
+        # treeRdd = DecisionTreeModel(self.model._java_model.trees()[0])
+        # myDebugger.DEBUG(treeRdd.predict(testData).collect())
 
-        for pred in predictions:
-            myDebugger.DEBUG(pred.count())
+        # trees = [DecisionTreeModel(self.model._java_model.trees()[i]) for i in range(100)]
+        #
+        #
+        # predictions = [t.predict(testData) for t in trees]
+        #
+        # for pred in predictions:
+        #     myDebugger.DEBUG(pred.count())
 
 
     # def evaluate(self, performanceMeasures):
@@ -109,7 +117,7 @@ class ActiveLearner:
 
 
 
-class ActiveLearnerRandom(ActiveLearner):
+class DistributedActiveLearnerRandom(ActiveLearner):
     '''Randomly samples the points'''
 
     def selectNext(self):
@@ -132,17 +140,51 @@ class ActiveLearnerRandom(ActiveLearner):
 
 
 
-class ActiveLearnerUncertainty(ActiveLearner):
+class DistributedActiveLearnerUncertainty(ActiveLearner):
     '''Points are sampled according to uncertainty sampling criterion'''
 
     def selectNext(self):
         # predict for the rest the datapoints
-        unknownPrediction = self.model.predict_proba(self.dataset.trainData[self.indicesUnknown, :])[:, 0]
-        selectedIndex1toN = np.argsort(np.absolute(unknownPrediction - 0.5))[0]
-        selectedIndex = self.indicesUnknown[selectedIndex1toN]
+        trainDataUnknown = self.indicesUnknown.map(lambda _: (_, None)) \
+            .leftOuterJoin(self.dataset.trainSet) \
+            .map(lambda _: (_[0], _[1][1]))
 
-        self.indicesKnown = np.concatenate(([self.indicesKnown, np.array([selectedIndex])]))
-        self.indicesUnknown = np.delete(self.indicesUnknown, selectedIndex1toN)
+        rdd = sc.parallelize([])
+
+        ''' these java objects are not serializable
+         thus still no support to make an RDD out of it!! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        '''
+        for x in self.model._java_model.trees():
+            '''
+             zipping each prediction from each decision tree
+             with individual sample index so that they can be
+             added later
+            '''
+            predX = DecisionTreeModel(x)\
+                .predict(trainDataUnknown.map(lambda _ : _[1].features))\
+                .zipWithIndex()\
+                .map(lambda _: (_[1], _[0]))
+            rdd = rdd.union(predX)
+
+        ''' adding up no. of 1 in each sample's prediction this is the class prediction of 1s'''
+        classPrediction = rdd.groupByKey().mapValues(sum)
+
+
+        #  direct self.nEstimators gives error
+        totalEstimators = self.nEstimators
+        #  predicted probability of class 0
+        classPrediction = classPrediction.map(lambda _  : (_[0], abs(0.5 - (1-(_[1]/totalEstimators)))))
+
+        # Selecting the index which has the highest uncertainty/ closest to probability 0.5
+        selectedIndex1toN = classPrediction.sortBy(lambda _ : _[1]).first()[0]
+
+
+        # takes the selectedIndex from the unknown samples and add it to the known ones
+        self.indicesKnown = self.indicesKnown \
+            .union(sc.parallelize([selectedIndex1toN]))
+
+        # removing first sample from unlabeled ones(update)
+        self.indicesUnknown = self.indicesUnknown.filter(lambda _: _ != selectedIndex1toN)
 
 
 
@@ -209,14 +251,7 @@ class ActiveLearnerLAL(ActiveLearner):
 dtst = DatasetCheckerboard2x2()
 # set the starting point
 dtst.setStartState(2)
-# Active learning strategies
-# alR = ActiveLearnerRandom(dtst, 50, 'random')
-# alR.selectNext()
 
-alU = ActiveLearnerUncertainty(dtst, 50, 'uncertainty')
+alU = DistributedActiveLearnerUncertainty(dtst, 50, 'uncertainty')
 alU.train()
-# alU.selectNext()
-
-
-# alLALindepend = ActiveLearnerLAL(dtst, 50, 'lal-rand', "")
-# alLALindepend.selectNext()
+alU.selectNext()
