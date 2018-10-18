@@ -56,7 +56,7 @@ class ActiveLearner:
         '''train the base classification model on currently available datapoints'''
 
         # first fetch the subset of training data which match the indices of the known indices
-        trainDataKnown = self.indicesKnown.map(lambda _ : (_, None))\
+        self.trainDataKnown = self.indicesKnown.map(lambda _ : (_, None))\
             .leftOuterJoin(self.dataset.trainSet)\
             .map(lambda _ : (_[0], _[1][1]))
 
@@ -64,7 +64,7 @@ class ActiveLearner:
 
 
         # train a RFclassifer with this data
-        self.model = RandomForest.trainClassifier(trainDataKnown.map(lambda _ : _[1]),
+        self.model = RandomForest.trainClassifier(self.trainDataKnown.map(lambda _ : _[1]),
                                                   numClasses=2,
                                                   categoricalFeaturesInfo={},
                                                   numTrees=self.nEstimators,
@@ -145,9 +145,13 @@ class DistributedActiveLearnerUncertainty(ActiveLearner):
 
     def selectNext(self):
         # predict for the rest the datapoints
-        trainDataUnknown = self.indicesUnknown.map(lambda _: (_, None)) \
+        self.trainDataUnknown = self.indicesUnknown.map(lambda _: (_, None)) \
             .leftOuterJoin(self.dataset.trainSet) \
             .map(lambda _: (_[0], _[1][1]))
+
+        actualIndices = self.trainDataUnknown.map(lambda _ : _[0])\
+            .zipWithIndex()\
+            .map(lambda _: (_[1], _[0]))
 
         rdd = sc.parallelize([])
 
@@ -161,9 +165,11 @@ class DistributedActiveLearnerUncertainty(ActiveLearner):
              added later
             '''
             predX = DecisionTreeModel(x)\
-                .predict(trainDataUnknown.map(lambda _ : _[1].features))\
+                .predict(self.trainDataUnknown.map(lambda _ : _[1].features))\
                 .zipWithIndex()\
                 .map(lambda _: (_[1], _[0]))
+
+            predX = actualIndices.leftOuterJoin(predX).map(lambda _ : _[1])
             rdd = rdd.union(predX)
 
         ''' adding up no. of 1 in each sample's prediction this is the class prediction of 1s'''
@@ -185,6 +191,12 @@ class DistributedActiveLearnerUncertainty(ActiveLearner):
 
         # removing first sample from unlabeled ones(update)
         self.indicesUnknown = self.indicesUnknown.filter(lambda _: _ != selectedIndex1toN)
+
+
+
+        # myDebugger.DEBUG(selectedIndex1toN)
+        # myDebugger.DEBUG(self.indicesKnown.collect())
+        # myDebugger.DEBUG(self.indicesUnknown.collect())
 
 
 
@@ -252,6 +264,12 @@ dtst = DatasetCheckerboard2x2()
 # set the starting point
 dtst.setStartState(2)
 
-alU = DistributedActiveLearnerUncertainty(dtst, 50, 'uncertainty')
-alU.train()
-alU.selectNext()
+# alU = DistributedActiveLearnerUncertainty(dtst, 50, 'uncertainty')
+#
+# for i in range(100):
+#     alU.train()
+#     alU.selectNext()
+#
+#
+# myDebugger.DEBUG(alU.indicesKnown.collect())
+# myDebugger.DEBUG(alU.indicesUnknown.collect())
