@@ -20,7 +20,7 @@ from datetime import timedelta
 #     .setMaster("local[4]").set("spark.executor.memory","1g");
 
 sc = SparkContext.getOrCreate()
-# sc.setLogLevel("ERROR")
+sc.setLogLevel("ERROR")
 
 myDebugger = Debugger()
 
@@ -153,6 +153,9 @@ class DistributedActiveLearnerUncertainty(ActiveLearner):
             .zipWithIndex()\
             .map(lambda _: (_[1], _[0]))
 
+        myDebugger.TIMESTAMP('zipping indices ')
+
+
         rdd = sc.parallelize([])
 
         ''' these java objects are not serializable
@@ -172,8 +175,12 @@ class DistributedActiveLearnerUncertainty(ActiveLearner):
             predX = actualIndices.leftOuterJoin(predX).map(lambda _ : _[1])
             rdd = rdd.union(predX)
 
+        myDebugger.TIMESTAMP('get individual tree predictions')
+
         ''' adding up no. of 1 in each sample's prediction this is the class prediction of 1s'''
         classPrediction = rdd.groupByKey().mapValues(sum)
+
+        myDebugger.TIMESTAMP('reducing ')
 
 
         #  direct self.nEstimators gives error
@@ -181,22 +188,33 @@ class DistributedActiveLearnerUncertainty(ActiveLearner):
         #  predicted probability of class 0
         classPrediction = classPrediction.map(lambda _  : (_[0], abs(0.5 - (1-(_[1]/totalEstimators)))))
 
+        myDebugger.TIMESTAMP('mapping')
+
+
         # Selecting the index which has the highest uncertainty/ closest to probability 0.5
         selectedIndex1toN = classPrediction.sortBy(lambda _ : _[1]).first()[0]
 
 
+        myDebugger.TIMESTAMP('sorting')
+
         # takes the selectedIndex from the unknown samples and add it to the known ones
-        self.indicesKnown = self.indicesKnown \
-            .union(sc.parallelize([selectedIndex1toN]))
+        self.indicesKnown = self.indicesKnown .union(sc.parallelize([selectedIndex1toN]))
+
+
+        myDebugger.TIMESTAMP('update known indices')
 
         # removing first sample from unlabeled ones(update)
         self.indicesUnknown = self.indicesUnknown.filter(lambda _: _ != selectedIndex1toN)
 
+        myDebugger.TIMESTAMP('update unknown indices')
 
 
-        # myDebugger.DEBUG(selectedIndex1toN)
-        # myDebugger.DEBUG(self.indicesKnown.collect())
-        # myDebugger.DEBUG(self.indicesUnknown.collect())
+        myDebugger.DEBUG(selectedIndex1toN)
+        myDebugger.DEBUG(self.indicesKnown.collect())
+        myDebugger.DEBUG(self.indicesUnknown.collect())
+
+
+        myDebugger.TIMESTAMP('DEBUGGING DONE')
 
 
 
@@ -264,11 +282,18 @@ dtst = DatasetCheckerboard2x2()
 # set the starting point
 dtst.setStartState(2)
 
-# alU = DistributedActiveLearnerUncertainty(dtst, 50, 'uncertainty')
-#
-# for i in range(100):
-#     alU.train()
-#     alU.selectNext()
+alU = DistributedActiveLearnerUncertainty(dtst, 50, 'uncertainty')
+
+alU.train()
+myDebugger.TIMESTAMP('MODEL TRAINED!!')
+
+
+
+
+alU.selectNext()
+
+
+
 #
 #
 # myDebugger.DEBUG(alU.indicesKnown.collect())
