@@ -17,7 +17,7 @@ t1 = datetime.datetime.now()
 
 
 #data = sc.textFile('file:///home/ubuntu/SOURCE_CODE/src/creditcard.csv')
-data = sc.textFile('file:///home/ubuntu/lal_direct_mllib_implementation/ITERATIVE_TREE_BIG.txt')
+data = sc.textFile('hdfs://node1:9000/input/lal_randomtree_simulatedunbalanced_big.txt')
 #data = data.filter(lambda _ : _[0][0] != '"')
 data = data.map(lambda _ : _.strip().split(' '))
 data = data.map(lambda row : LabeledPoint(float(row[-1]), row[:-1]))

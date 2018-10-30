@@ -4,9 +4,12 @@ from pyspark.mllib.linalg import Vectors
 from pyspark.mllib.tree import RandomForest, RandomForestModel
 from pyspark.mllib.util import MLUtils
 from pyspark.mllib.feature import StandardScaler, StandardScalerModel
+from pyspark.mllib.stat import Statistics
+from pyspark.mllib.linalg.distributed import RowMatrix
 from pyspark.mllib.tree import DecisionTreeModel
 from dataset import *
 from debugger import *
+import math
 import random
 import datetime
 from datetime import timedelta
@@ -70,6 +73,7 @@ class ActiveLearner:
                                                   numTrees=self.nEstimators,
                                                   featureSubsetStrategy="auto",
                                                   impurity='gini')
+
 
 
 
@@ -221,7 +225,11 @@ class DistributedActiveLearnerUncertainty(ActiveLearner):
 
 
 
-
+def getSD( x, totalEstimators):
+    sumValue = x[1]
+    mean = sumValue / totalEstimators
+    sd = math.sqrt((sumValue * ((1 - mean) ** 2) + (totalEstimators - sumValue) * (mean ** 2)) / (totalEstimators-1))
+    return (x[0], sd)
 
 
 
@@ -230,24 +238,64 @@ class ActiveLearnerLAL(ActiveLearner):
 
     def __init__(self, dataset, nEstimators, name, lalModel):
         ActiveLearner.__init__(self, dataset, nEstimators, name)
-        # self.model = RandomForestClassifier(self.nEstimators, oob_score=True, n_jobs=8)
         self.lalModel = lalModel
 
+
+
+
+
+
+
     def selectNext(self):
-        unknown_data = self.indicesUnknown.map(lambda _ : (_, None))\
-            .leftOuterJoin(self.dataset.trainSet)\
-            .map(lambda _ : (_[0], _[1][1]))
+        # get predictions from individual trees
+        self.trainDataUnknown = self.indicesUnknown.map(lambda _: (_, None)) \
+            .leftOuterJoin(self.dataset.trainSet) \
+            .map(lambda _: (_[0], _[1][1]))
+
+        actualIndices = self.trainDataUnknown.map(lambda _: _[0]) \
+            .zipWithIndex() \
+            .map(lambda _: (_[1], _[0]))
+
+        rdd = sc.parallelize([])
+
+        ''' these java objects are not serializable
+         thus still no support to make an RDD out of it!! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        '''
+        for x in self.model._java_model.trees():
+            '''
+             zipping each prediction from each decision tree
+             with individual sample index so that they can be
+             added later
+            '''
+            predX = DecisionTreeModel(x) \
+                .predict(self.trainDataUnknown.map(lambda _: _[1].features)) \
+                .zipWithIndex() \
+                .map(lambda _: (_[1], _[0]))
+
+            predX = actualIndices.leftOuterJoin(predX).map(lambda _: _[1])
+            rdd = rdd.union(predX)
+
+        ''' adding up no. of 1 in each sample's prediction this is the class prediction of 1s'''
+        sumScore = rdd.groupByKey().mapValues(sum)
+        totalEstimators = self.nEstimators
 
 
-        myDebugger.DEBUG(unknown_data.collect())
+        # average of the predicted scores
+        f_1 = sumScore.map(lambda _: (_[0], _[1] / totalEstimators))
 
-        known_labels = self.dataset.trainLabels[self.indicesKnown, :]
-        n_lablled = np.size(self.indicesKnown)
-        n_dim = np.shape(self.dataset.trainData)[1]
-        #
-        # # predictions of the trees
-        # temp = np.array([tree.predict_proba(unknown_data)[:, 0] for tree in self.model.estimators_])
-        # # - average and standard deviation of the predicted scores
+        # standard deviation of predicted scores
+        f_2 = sumScore.map(lambda _ : getSD(_,totalEstimators))
+        
+
+
+
+
+
+
+
+
+
+        # - average and standard deviation of the predicted scores
         # f_1 = np.mean(temp, axis=0)
         # f_2 = np.std(temp, axis=0)
         # # - proportion of positive points
@@ -282,19 +330,16 @@ dtst = DatasetCheckerboard2x2()
 # set the starting point
 dtst.setStartState(2)
 
-alU = DistributedActiveLearnerUncertainty(dtst, 50, 'uncertainty')
+# alU = DistributedActiveLearnerUncertainty(dtst, 50, 'uncertainty')
+#
+# alU.train()
+# myDebugger.TIMESTAMP('MODEL TRAINED!!')
+# alU.selectNext()
 
-alU.train()
+
+alLALindepend = ActiveLearnerLAL(dtst, 50, 'lal-rand', '')
+alLALindepend.train()
 myDebugger.TIMESTAMP('MODEL TRAINED!!')
+alLALindepend.selectNext()
 
 
-
-
-alU.selectNext()
-
-
-
-#
-#
-# myDebugger.DEBUG(alU.indicesKnown.collect())
-# myDebugger.DEBUG(alU.indicesUnknown.collect())
