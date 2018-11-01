@@ -260,18 +260,14 @@ class ActiveLearnerLAL(ActiveLearner):
          thus still no support to make an RDD out of it!! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         '''
         for x in self.model._java_model.trees():
-            '''
-             zipping each prediction from each decision tree
-             with individual sample index so that they can be
-             added later
-            '''
+            # zipping each prediction from each decision tree with individual sample index so that they can be added later
             predX = DecisionTreeModel(x) \
                 .predict(self.trainDataUnknown.map(lambda _: _[1].features)) \
                 .zipWithIndex() \
                 .map(lambda _: (_[1], _[0]))
-
             predX = actualIndices.leftOuterJoin(predX).map(lambda _: _[1])
             rdd = rdd.union(predX)
+
 
         ''' adding up no. of 1 in each sample's prediction this is the class prediction of 1s'''
         sumScore = rdd.groupByKey().mapValues(sum)
@@ -297,7 +293,14 @@ class ActiveLearnerLAL(ActiveLearner):
         # - number of already labelled datapoints
         f_8 = f_3.map(lambda _ : nLabeled)
 
-        myDebugger.DEBUG(f_8.collect())
+        LALfeatures = f_1.map(lambda _ : _[1])
+        tempRdd = f_2.map(lambda _: _[1]).union(f_3).union(f_6).union(f_8)
+        LALfeatures = LALfeatures.union(tempRdd)
+
+        myDebugger.DEBUG(LALfeatures.collect())
+
+
+
 
 
         # # - coeficient of variance of feature importance
@@ -306,7 +309,7 @@ class ActiveLearnerLAL(ActiveLearner):
         # # - compute the average depth of the trees in the forest
         # f_7 = np.mean(np.array([tree.tree_.max_depth for tree in self.model.estimators_])) * np.ones_like(f_1)
 
-        #
+
         # # all the featrues put together for regressor
         # LALfeatures = np.concatenate(([f_1], [f_2], [f_3], [f_4], [f_5], [f_6], [f_7], [f_8]), axis=0)
         # LALfeatures = np.transpose(LALfeatures)
