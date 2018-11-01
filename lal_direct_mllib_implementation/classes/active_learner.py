@@ -77,6 +77,8 @@ class ActiveLearner:
 
 
 
+
+
         # treeRdd = DecisionTreeModel(self.model._java_model.trees()[0])
         # myDebugger.DEBUG(treeRdd.predict(testData).collect())
 
@@ -240,22 +242,18 @@ class ActiveLearnerLAL(ActiveLearner):
         ActiveLearner.__init__(self, dataset, nEstimators, name)
         self.lalModel = lalModel
 
-
-
-
-
-
-
     def selectNext(self):
         # get predictions from individual trees
         self.trainDataUnknown = self.indicesUnknown.map(lambda _: (_, None)) \
             .leftOuterJoin(self.dataset.trainSet) \
             .map(lambda _: (_[0], _[1][1]))
 
+        # zipping actual indices with dummy indices so that they can be traced later
         actualIndices = self.trainDataUnknown.map(lambda _: _[0]) \
             .zipWithIndex() \
             .map(lambda _: (_[1], _[0]))
 
+        # an empty RDD
         rdd = sc.parallelize([])
 
         ''' these java objects are not serializable
@@ -285,31 +283,29 @@ class ActiveLearnerLAL(ActiveLearner):
 
         # standard deviation of predicted scores
         f_2 = sumScore.map(lambda _ : getSD(_,totalEstimators))
-        
+
+        # - proportion of positive points
+        nLabeled = self.trainDataKnown.count()
+        nUnlabeled = self.trainDataUnknown.count()
+        proportionPositivePoints = (self.trainDataKnown.map(lambda _ : _[1].label).reduce(lambda x,y : x+y)) / nLabeled
+        f_3 = f_1.map(lambda _ : proportionPositivePoints)
+
+        # - estimate variance of forest by looking at avergae of variance of some predictions
+        estimateVariance = (f_2.map(lambda _ : _[1]).reduce(lambda x,y : x+y)) / nUnlabeled
+        f_6 = f_3.map(lambda _ : estimateVariance)
+
+        # - number of already labelled datapoints
+        f_8 = f_3.map(lambda _ : nLabeled)
+
+        myDebugger.DEBUG(f_8.collect())
 
 
-
-
-
-
-
-
-
-        # - average and standard deviation of the predicted scores
-        # f_1 = np.mean(temp, axis=0)
-        # f_2 = np.std(temp, axis=0)
-        # # - proportion of positive points
-        # f_3 = (sum(known_labels > 0) / n_lablled) * np.ones_like(f_1)
-        # # the score estimated on out of bag estimate
-        # f_4 = self.model.oob_score_ * np.ones_like(f_1)
         # # - coeficient of variance of feature importance
         # f_5 = np.std(self.model.feature_importances_ / n_dim) * np.ones_like(f_1)
-        # # - estimate variance of forest by looking at avergae of variance of some predictions
-        # f_6 = np.mean(f_2, axis=0) * np.ones_like(f_1)
+
         # # - compute the average depth of the trees in the forest
         # f_7 = np.mean(np.array([tree.tree_.max_depth for tree in self.model.estimators_])) * np.ones_like(f_1)
-        # # - number of already labelled datapoints
-        # f_8 = np.size(self.indicesKnown) * np.ones_like(f_1)
+
         #
         # # all the featrues put together for regressor
         # LALfeatures = np.concatenate(([f_1], [f_2], [f_3], [f_4], [f_5], [f_6], [f_7], [f_8]), axis=0)
