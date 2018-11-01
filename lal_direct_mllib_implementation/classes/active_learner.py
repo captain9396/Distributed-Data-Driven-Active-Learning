@@ -293,11 +293,32 @@ class ActiveLearnerLAL(ActiveLearner):
         # - number of already labelled datapoints
         f_8 = f_3.map(lambda _ : nLabeled)
 
-        LALfeatures = f_1.map(lambda _ : _[1])
-        tempRdd = f_2.map(lambda _: _[1]).union(f_3).union(f_6).union(f_8)
-        LALfeatures = LALfeatures.union(tempRdd)
 
-        myDebugger.DEBUG(LALfeatures.collect())
+
+        myDebugger.TIMESTAMP('HOLA')
+
+        # transposing start
+        tempf_1 = f_1.map(lambda _ : _[1]).zipWithIndex().map(lambda _ : (_[1],_[0]))
+        tempf_2 = f_2.map(lambda _: _[1]).zipWithIndex().map(lambda _ : (_[1],_[0]))
+        tempf_3 = f_3.zipWithIndex().map(lambda _ : (_[1],_[0]))
+        tempf_6 = f_6.zipWithIndex().map(lambda _ : (_[1],_[0]))
+        tempf_8 = f_8.zipWithIndex().map(lambda _ : (_[1],_[0]))
+
+
+        tempRDD = tempf_1\
+            .leftOuterJoin(tempf_2)\
+            .leftOuterJoin(tempf_3)\
+            .leftOuterJoin(tempf_6)\
+            .leftOuterJoin(tempf_8)\
+            .map(lambda _  : (_[0] ,
+                              ( _[1][0][0][0][0],  _[1][0][0][0][1],  _[1][0][0][1], _[1][0][1], _[1][1])))
+
+
+        myDebugger.DEBUG(tempRDD.collect())
+
+        myDebugger.TIMESTAMP('LALA')
+
+
 
 
 
