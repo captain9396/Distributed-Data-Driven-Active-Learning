@@ -15,7 +15,6 @@ import datetime
 from datetime import timedelta
 
 
-
 # setup spark context and config
 # conf = SparkConf().setAppName("test")
 
@@ -303,40 +302,24 @@ class ActiveLearnerLAL(ActiveLearner):
         tempf_3 = f_3.zipWithIndex().map(lambda _ : (_[1],_[0]))
         tempf_6 = f_6.zipWithIndex().map(lambda _ : (_[1],_[0]))
         tempf_8 = f_8.zipWithIndex().map(lambda _ : (_[1],_[0]))
-
-
-        tempRDD = tempf_1\
+        LALDataset = tempf_1\
             .leftOuterJoin(tempf_2)\
             .leftOuterJoin(tempf_3)\
             .leftOuterJoin(tempf_6)\
             .leftOuterJoin(tempf_8)\
-            .map(lambda _  : (_[0] ,
-                              ( _[1][0][0][0][0],  _[1][0][0][0][1],  _[1][0][0][1], _[1][0][1], _[1][1])))
+            .map(lambda _  : LabeledPoint(_[0] ,
+                              [_[1][0][0][0][0],  _[1][0][0][0][1],  _[1][0][0][1], _[1][0][1], _[1][1]]))
 
 
-        myDebugger.DEBUG(tempRDD.collect())
 
+        # # predict the expected reduction in the error by adding the point
+        LALprediction = self.lalModel.predict(LALDataset.map(lambda _ : _.features))
+
+        myDebugger.DEBUG(LALprediction.collect())
         myDebugger.TIMESTAMP('LALA')
 
 
 
-
-
-
-
-        # # - coeficient of variance of feature importance
-        # f_5 = np.std(self.model.feature_importances_ / n_dim) * np.ones_like(f_1)
-
-        # # - compute the average depth of the trees in the forest
-        # f_7 = np.mean(np.array([tree.tree_.max_depth for tree in self.model.estimators_])) * np.ones_like(f_1)
-
-
-        # # all the featrues put together for regressor
-        # LALfeatures = np.concatenate(([f_1], [f_2], [f_3], [f_4], [f_5], [f_6], [f_7], [f_8]), axis=0)
-        # LALfeatures = np.transpose(LALfeatures)
-        #
-        # # predict the expercted reduction in the error by adding the point
-        # LALprediction = self.lalModel.predict(LALfeatures)
         # # select the datapoint with the biggest reduction in the error
         # selectedIndex1toN = np.argmax(LALprediction)
         # # retrieve the real index of the selected datapoint
@@ -346,18 +329,17 @@ class ActiveLearnerLAL(ActiveLearner):
         # self.indicesUnknown = np.delete(self.indicesUnknown, selectedIndex1toN)
 
 
+regressionData = sc.textFile('hdfs://node1:9000/input/lal_randomtree_simulatedunbalanced_big.txt')
+reg = regressionData.map(lambda _ : _.split(' '))
+reg = reg.map(lambda _ : LabeledPoint(_[-1] , [_[0],_[1],_[2],_[5],_[7]]))
+lalmodel = RandomForest.trainRegressor(reg, numTrees=100, categoricalFeaturesInfo={})
+
 dtst = DatasetCheckerboard2x2()
 # set the starting point
 dtst.setStartState(2)
 
-# alU = DistributedActiveLearnerUncertainty(dtst, 50, 'uncertainty')
-#
-# alU.train()
-# myDebugger.TIMESTAMP('MODEL TRAINED!!')
-# alU.selectNext()
 
-
-alLALindepend = ActiveLearnerLAL(dtst, 50, 'lal-rand', '')
+alLALindepend = ActiveLearnerLAL(dtst, 50, 'lal-rand', lalmodel )
 alLALindepend.train()
 myDebugger.TIMESTAMP('MODEL TRAINED!!')
 alLALindepend.selectNext()
