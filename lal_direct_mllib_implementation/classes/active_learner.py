@@ -294,7 +294,7 @@ class ActiveLearnerLAL(ActiveLearner):
 
 
 
-        myDebugger.TIMESTAMP('HOLA')
+        myDebugger.TIMESTAMP('features ready for transposing')
 
         # transposing start
         tempf_1 = f_1.map(lambda _ : _[1]).zipWithIndex().map(lambda _ : (_[1],_[0]))
@@ -310,32 +310,60 @@ class ActiveLearnerLAL(ActiveLearner):
             .map(lambda _  : LabeledPoint(_[0] ,
                               [_[1][0][0][0][0],  _[1][0][0][0][1],  _[1][0][0][1], _[1][0][1], _[1][1]]))
 
-
+        myDebugger.TIMESTAMP('transposing done')
 
         # # predict the expected reduction in the error by adding the point
-        LALprediction = self.lalModel.predict(LALDataset.map(lambda _ : _.features))
+        LALprediction = self.lalModel.predict(LALDataset.map(lambda _ : _.features))\
+            .zipWithIndex()\
+            .map(lambda _ : (_[1],_[0]))
+        myDebugger.TIMESTAMP('prediction done')
 
-        myDebugger.DEBUG(LALprediction.collect())
-        myDebugger.TIMESTAMP('LALA')
 
 
 
-        # # select the datapoint with the biggest reduction in the error
-        # selectedIndex1toN = np.argmax(LALprediction)
-        # # retrieve the real index of the selected datapoint
-        # selectedIndex = self.indicesUnknown[selectedIndex1toN]
-        #
-        # self.indicesKnown = np.concatenate(([self.indicesKnown, np.array([selectedIndex])]))
-        # self.indicesUnknown = np.delete(self.indicesUnknown, selectedIndex1toN)
+        # Selecting the index which has the highest uncertainty/ closest to probability 0.5
+        selectedIndex1toN = LALprediction.sortBy(lambda _: _[1]).max()[0]
+
+        # takes the selectedIndex from the unknown samples and add it to the known ones
+        self.indicesKnown = self.indicesKnown.union(sc.parallelize([selectedIndex1toN]))
+
+        # removing first sample from unlabeled ones(update)
+        self.indicesUnknown = self.indicesUnknown.filter(lambda _: _ != selectedIndex1toN)
+
+
+
+        ''' debugging block '''
+        myDebugger.TIMESTAMP('update unknown indices')
+        myDebugger.DEBUG(selectedIndex1toN)
+        myDebugger.DEBUG(self.indicesKnown.collect())
+        myDebugger.DEBUG(self.indicesUnknown.collect())
+        myDebugger.TIMESTAMP('DEBUGGING DONE')
+
+
+
+
+
+
+
+
 
 
 regressionData = sc.textFile('hdfs://node1:9000/input/lal_randomtree_simulatedunbalanced_big.txt')
 reg = regressionData.map(lambda _ : _.split(' '))
 reg = reg.map(lambda _ : LabeledPoint(_[-1] , [_[0],_[1],_[2],_[5],_[7]]))
-lalmodel = RandomForest.trainRegressor(reg, numTrees=100, categoricalFeaturesInfo={})
+
+myDebugger.TIMESTAMP('---------------------------model saving start--------------------------------')
+MODEL_LOCATION = 'hdfs://node1:9000/regression_model'
+try:
+    lalmodel = RandomForestModel.load(sc, MODEL_LOCATION)
+except:
+    lalmodel = RandomForest.trainRegressor(reg, numTrees=2000, categoricalFeaturesInfo={})
+    lalmodel.save(sc, MODEL_LOCATION)
+myDebugger.TIMESTAMP('---------------------------model saving finish--------------------------------')
+
+
 
 dtst = DatasetCheckerboard2x2()
-# set the starting point
 dtst.setStartState(2)
 
 
