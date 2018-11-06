@@ -29,7 +29,7 @@ class Debugger:
 
     def TIMESTAMP(self, id):
         print('####################-------------------------------      ', id,'     ------------------------------------------############################')
-        self.getRunningTime()
+        return self.getRunningTime()
 
     def getRunningTime(self):
         t2 = datetime.datetime.now()
@@ -39,6 +39,7 @@ class Debugger:
         print('************************    Time elapsed = ', time_difference_in_minutes, ' minutes    |||    ',time_difference_in_minutes * 60 ,' seconds ************************')
         print('-------------------------------------------------------   TOTAL TIME = ' , self.totalTime)
         self.t1 = t2
+        return time_difference_in_minutes * 60
 
 
 

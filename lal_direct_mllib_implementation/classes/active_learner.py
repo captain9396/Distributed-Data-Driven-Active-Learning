@@ -1,3 +1,6 @@
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
 from pyspark import SparkContext, SparkConf
 from pyspark.mllib.regression import LabeledPoint
 from pyspark.mllib.linalg import Vectors
@@ -58,13 +61,12 @@ class ActiveLearner:
         '''train the base classification model on currently available datapoints'''
 
         # first fetch the subset of training data which match the indices of the known indices
+        myDebugger.TIMESTAMP('fetch known data')
         self.trainDataKnown = self.indicesKnown.map(lambda _ : (_, None))\
             .leftOuterJoin(self.dataset.trainSet)\
             .map(lambda _ : (_[0], _[1][1]))
 
-        # testData = self.dataset.testSet.map(lambda _ : _[1].features)
-
-
+        myDebugger.TIMESTAMP('fetch known data finish')
         # train a RFclassifer with this data
         self.model = RandomForest.trainClassifier(self.trainDataKnown.map(lambda _ : _[1]),
                                                   numClasses=2,
@@ -137,6 +139,7 @@ class DistributedActiveLearnerRandom(ActiveLearner):
         # removing first sample from unlabeled ones(update)
         first = self.indicesUnknown.first()
         self.indicesUnknown = self.indicesUnknown.filter(lambda _ : _ != first)
+        myDebugger.DEBUG(self.indicesKnown.collect())
 
 
 
@@ -327,7 +330,7 @@ class ActiveLearnerLAL(ActiveLearner):
         # takes the selectedIndex from the unknown samples and add it to the known ones
         self.indicesKnown = self.indicesKnown.union(sc.parallelize([selectedIndex1toN]))
 
-        # removing first sample from unlabeled ones(update)
+        # updating unknown indices
         self.indicesUnknown = self.indicesUnknown.filter(lambda _: _ != selectedIndex1toN)
 
 
@@ -348,28 +351,40 @@ class ActiveLearnerLAL(ActiveLearner):
 
 
 
-regressionData = sc.textFile('hdfs://node1:9000/input/lal_randomtree_simulatedunbalanced_big.txt')
-reg = regressionData.map(lambda _ : _.split(' '))
-reg = reg.map(lambda _ : LabeledPoint(_[-1] , [_[0],_[1],_[2],_[5],_[7]]))
-
-myDebugger.TIMESTAMP('---------------------------model saving start--------------------------------')
-MODEL_LOCATION = 'hdfs://node1:9000/regression_model'
-try:
-    lalmodel = RandomForestModel.load(sc, MODEL_LOCATION)
-except:
-    lalmodel = RandomForest.trainRegressor(reg, numTrees=2000, categoricalFeaturesInfo={})
-    lalmodel.save(sc, MODEL_LOCATION)
-myDebugger.TIMESTAMP('---------------------------model saving finish--------------------------------')
+# regressionData = sc.textFile('hdfs://node1:9000/input/lal_randomtree_simulatedunbalanced_big.txt')
+# reg = regressionData.map(lambda _ : _.split(' '))
+# reg = reg.map(lambda _ : LabeledPoint(_[-1] , [_[0],_[1],_[2],_[5],_[7]]))
+#
+# myDebugger.TIMESTAMP('---------------------------model saving start--------------------------------')
+# MODEL_LOCATION = 'hdfs://node1:9000/regression_model'
+# try:
+#     lalmodel = RandomForestModel.load(sc, MODEL_LOCATION)
+# except:
+#     lalmodel = RandomForest.trainRegressor(reg, numTrees=2000, categoricalFeaturesInfo={})
+#     lalmodel.save(sc, MODEL_LOCATION)
+# myDebugger.TIMESTAMP('---------------------------model saving finish--------------------------------')
 
 
 
 dtst = DatasetCheckerboard2x2()
 dtst.setStartState(2)
 
+X = []
+y = []
 
-alLALindepend = ActiveLearnerLAL(dtst, 50, 'lal-rand', lalmodel )
-alLALindepend.train()
-myDebugger.TIMESTAMP('MODEL TRAINED!!')
-alLALindepend.selectNext()
+alR = DistributedActiveLearnerRandom(dtst, 50 , 'random')
+for i in range(990):
+    alR.train()
+    alR.selectNext()
+    x = myDebugger.TIMESTAMP('MODEL TRAINED!!')
+    y.append(x)
+    X.append(i+1)
+
+plt.plot(X,y)
+plt.savefig('alrandom_first.png')
+# alLALindepend = ActiveLearnerLAL(dtst, 50, 'lal-rand', lalmodel )
+# alLALindepend.train()
+# myDebugger.TIMESTAMP('MODEL TRAINED!!')
+# alLALindepend.selectNext()
 
 
