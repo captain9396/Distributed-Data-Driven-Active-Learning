@@ -23,7 +23,7 @@ spark = SparkSession(sc)
 
 
 
-data = sc.textFile('hdfs://node1:9000/input/vectors_100000x100.txt')
+data = sc.textFile('hdfs://node1:9000/input/vectors_50000x1000.txt')
 data = data.map(lambda _ : np.array(_.strip().split()).astype(float))
 data = data.map(lambda _ : _/np.linalg.norm(_))
 U = data.zipWithIndex().map(lambda _ : IndexedRow(_[1], _[0]))
