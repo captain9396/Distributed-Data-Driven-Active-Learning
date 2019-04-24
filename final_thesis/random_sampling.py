@@ -12,6 +12,7 @@ from pyspark.mllib.linalg.distributed import IndexedRow, IndexedRowMatrix, Block
 from pyspark.mllib.linalg import Matrix, Matrices, DenseMatrix
 from pyspark.mllib.feature import Normalizer
 import numpy as np
+
 # setup spark context and config
 conf = SparkConf().setAppName("labeledPoints")
 sc = SparkContext(conf=conf)
@@ -43,7 +44,7 @@ test = test.map(lambda _ : LabeledPoint(0 if int(_[-1]) == -1 else 1, np.array(_
 
 
 
-window_size = 10
+window_size = 100
 
 train = train.zipWithIndex()
 keyfirst_train = train.map(lambda _: (_[1], _[0]))
@@ -84,29 +85,8 @@ while True:
 
     n_unlabeled = unlabeled_data.count()
 
-
-    rdd = sc.parallelize([])
-    for tree in model._java_model.trees():
-        predX = DecisionTreeModel(tree).predict(unlabeled_data.map(lambda _ : _[0].features))\
-            .zipWithIndex()\
-            .map(lambda _: (_[1], _[0]))
-        rdd = rdd.union(predX)
-
-
-    classPrediction = rdd.groupByKey().mapValues(sum)
-    classPrediction = classPrediction.sortByKey()
-    entropies = classPrediction.map(lambda _: abs(0.5 - (1-(_[1]/n_estimators))))
-
-    unlabeled_entropies = unlabeled_indices.map(lambda _: _[0])\
-        .zipWithIndex()\
-        .map(lambda _: (_[1], _[0]))\
-        .leftOuterJoin(entropies.zipWithIndex().map(lambda _:(_[1], _[0])))\
-        .map(lambda _:_[1])
-
-    sorted_unlabeled_entropies = unlabeled_entropies.sortBy(lambda _: _[1])
-
-
-    add_to_labeled_set = sc.parallelize(sorted_unlabeled_entropies.take(window_size))
+    unlabeled_indices = unlabeled_indices.sortBy(lambda _: np.random.uniform(0.0,1.0))
+    add_to_labeled_set = sc.parallelize(unlabeled_indices.take(window_size))
 
     unlabeled_indices = unlabeled_indices.subtractByKey(add_to_labeled_set)
     labeled_indices = labeled_indices.union(add_to_labeled_set.map(lambda _: (_[0], None)))

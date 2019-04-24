@@ -1,0 +1,86 @@
+labeled =  10  unlabeled =  9990
+Iteration  1  -- accu =  85.05
+labeled =  20  unlabeled =  9980
+Iteration  2  -- accu =  86.19
+labeled =  30  unlabeled =  9970
+Iteration  3  -- accu =  85.11
+labeled =  40  unlabeled =  9960
+Iteration  4  -- accu =  89.57
+labeled =  50  unlabeled =  9950
+Iteration  5  -- accu =  87.29
+labeled =  60  unlabeled =  9940
+Iteration  6  -- accu =  85.05
+labeled =  70  unlabeled =  9930
+
+Iteration  7  -- accu =  85.89
+labeled =  80  unlabeled =  9920
+Iteration  8  -- accu =  86.1
+labeled =  90  unlabeled =  9910
+Iteration  9  -- accu =  86.3
+labeled =  100  unlabeled =  9900
+    
+Iteration  10  -- accu =  87.65
+labeled =  110  unlabeled =  9890
+Iteration  11  -- accu =  88.61
+labeled =  120  unlabeled =  9880
+Iteration  12  -- accu =  86.47
+labeled =  130  unlabeled =  9870
+Iteration  13  -- accu =  87.16000000000001
+labeled =  140  unlabeled =  9860
+
+Iteration  14  -- accu =  90.78
+labeled =  150  unlabeled =  9850
+Iteration  15  -- accu =  88.68
+labeled =  160  unlabeled =  9840
+Iteration  16  -- accu =  91.39
+labeled =  170  unlabeled =  9830
+Iteration  17  -- accu =  89.02
+labeled =  180  unlabeled =  9820
+Iteration  18  -- accu =  90.71000000000001
+labeled =  190  unlabeled =  9810
+Iteration  19  -- accu =  91.45
+labeled =  200  unlabeled =  9800
+Iteration  20  -- accu =  91.64
+labeled =  210  unlabeled =  9790
+Iteration  21  -- accu =  89.89
+labeled =  220  unlabeled =  9780
+
+Iteration  22  -- accu =  91.36
+labeled =  230  unlabeled =  9770
+Iteration  23  -- accu =  92.9
+labeled =  240  unlabeled =  9760
+Iteration  24  -- accu =  92.47
+labeled =  250  unlabeled =  9750
+Iteration  25  -- accu =  91.82000000000001
+labeled =  260  unlabeled =  9740
+Iteration  26  -- accu =  91.69
+labeled =  270  unlabeled =  9730
+Iteration  27  -- accu =  92.02
+labeled =  280  unlabeled =  9720
+Iteration  28  -- accu =  91.88000000000001
+labeled =  290  unlabeled =  9710
+Iteration  29  -- accu =  91.9
+labeled =  300  unlabeled =  9700
+Iteration  30  -- accu =  92.45
+labeled =  310  unlabeled =  9690
+Iteration  31  -- accu =  90.7
+labeled =  320  unlabeled =  9680
+Iteration  32  -- accu =  91.75999999999999
+labeled =  330  unlabeled =  9670
+Iteration  33  -- accu =  91.61
+labeled =  340  unlabeled =  9660
+Iteration  34  -- accu =  92.43
+labeled =  350  unlabeled =  9650
+Iteration  35  -- accu =  91.49000000000001
+labeled =  360  unlabeled =  9640
+    
+
+
+Iteration  36  -- accu =  92.05
+labeled =  370  unlabeled =  9630
+Iteration  37  -- accu =  92.31
+labeled =  380  unlabeled =  9620
+Iteration  38  -- accu =  92.39
+labeled =  390  unlabeled =  9610
+Iteration  39  -- accu =  91.46
+
