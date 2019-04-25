@@ -1,1 +1,1 @@
-# Distributed-Data-Driven-Active-Learning
+# Distributed-Active-Learning
